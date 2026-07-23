@@ -341,3 +341,66 @@ tr:hover td {
   background: var(--danger);
   color: white;
 }
+
+/* --- Print Styles (PDF Export) --- */
+@media print {
+  body {
+    background: white;
+    color: black;
+    background-image: none;
+  }
+  
+  .glass-panel {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  
+  .app-header, .tabs, .clear-data-btn, .action-bar, .package-card, .packages-grid {
+    display: none !important;
+  }
+  
+  /* Hide the calc-container if it's not the summary dashboard */
+  .calc-container {
+    display: block !important;
+  }
+  
+  .calc-container > div:first-child {
+    display: none !important;
+  }
+  
+  .summary-dashboard {
+    padding: 0;
+  }
+  
+  h2, h3, .total-qty, .stat-box h3, .stat-box .value {
+    color: black !important;
+  }
+  
+  th {
+    color: black !important;
+    border-bottom: 2px solid black;
+  }
+  
+  td, th {
+    border-bottom: 1px solid #ccc;
+    padding: 0.5rem;
+  }
+  
+  .stat-box {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+  }
+  
+  .print-btn {
+    display: none !important;
+  }
+
+  /* Force page breaks if table gets too long */
+  table { page-break-inside:auto }
+  tr    { page-break-inside:avoid; page-break-after:auto }
+  thead { display:table-header-group }
+  tfoot { display:table-footer-group }
+}

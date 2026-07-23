@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calculator, Trash2, Plus, Minus, Save, RotateCcw } from 'lucide-react';
+import { Settings, Calculator, Trash2, Plus, Minus, Save, RotateCcw, Printer } from 'lucide-react';
 import { ITEMS, CATEGORIES, PACKAGE_TYPES, GROUP_SIZES, DEFAULT_TEMPLATES } from './data/items';
 
 function App() {
@@ -162,6 +162,30 @@ function App() {
             <h2 style={{ color: 'var(--primary)', marginBottom: '1.5rem', textAlign: 'center' }}>
               סיכום תוצאות המחשבון (רשימת איסוף)
             </h2>
+
+            {Object.keys(totals).length > 0 && (
+              <button 
+                onClick={() => window.print()} 
+                className="print-btn" 
+                style={{ 
+                  background: 'var(--primary)', 
+                  color: '#121212', 
+                  border: 'none', 
+                  padding: '0.75rem 1.5rem', 
+                  borderRadius: '8px', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  fontSize: '1.1rem', 
+                  fontWeight: 'bold', 
+                  margin: '0 auto 2rem auto',
+                  transition: 'all 0.3s'
+                }}
+              >
+                <Printer size={20} /> ייצא ל-PDF / הדפס רשימה
+              </button>
+            )}
 
             <div className="summary-stats">
               <div className="stat-box">
