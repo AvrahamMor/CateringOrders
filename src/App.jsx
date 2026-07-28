@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calculator, Trash2, Plus, Minus, Save, RotateCcw, Printer } from 'lucide-react';
+import { Settings, Calculator, Plus, Minus, RotateCcw, Printer } from 'lucide-react';
 import { ITEMS, CATEGORIES, PACKAGE_TYPES, GROUP_SIZES, DEFAULT_TEMPLATES } from './data/items';
 
 function App() {
@@ -71,6 +71,7 @@ function App() {
   // -- Calculation Logic --
   const calculateTotals = () => {
     const totals = {};
+    const boxTotals = {};
     let totalDiners = 0;
     let totalPackages = 0;
 
@@ -90,18 +91,24 @@ function App() {
               const amountPerGroup = Math.floor(baseAmount * multiplier);
               const totalAmount = amountPerGroup * count;
 
-              if (!totals[item.id]) totals[item.id] = 0;
-              totals[item.id] += totalAmount;
+              if (amountPerGroup > 0) {
+                if (!totals[item.id]) totals[item.id] = 0;
+                totals[item.id] += totalAmount;
+
+                if (!boxTotals[item.id]) boxTotals[item.id] = {};
+                if (!boxTotals[item.id][gs.id]) boxTotals[item.id][gs.id] = 0;
+                boxTotals[item.id][gs.id] += count;
+              }
             }
           });
         }
       });
     });
 
-    return { totals, totalDiners, totalPackages };
+    return { totals, boxTotals, totalDiners, totalPackages };
   };
 
-  const { totals, totalDiners, totalPackages } = calculateTotals();
+  const { totals, boxTotals, totalDiners, totalPackages } = calculateTotals();
 
   // Selected package for template editing
   const [selectedEditPkg, setSelectedEditPkg] = useState(PACKAGE_TYPES[0]);
@@ -205,6 +212,8 @@ function App() {
                 const catItems = ITEMS.filter(item => item.category === catKey && totals[item.id] > 0);
                 if (catItems.length === 0) return null;
 
+                const isSalad = catKey === 'salads';
+
                 return (
                   <div key={catKey} style={{ marginBottom: '2rem' }}>
                     <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>{catName}</h3>
@@ -212,17 +221,55 @@ function App() {
                       <table>
                         <thead>
                           <tr>
-                            <th style={{ textAlign: 'right' }}>מוצר</th>
-                            <th style={{ textAlign: 'left', width: '150px' }}>כמות כוללת לאסוף</th>
+                            <th style={{ textAlign: 'right', width: isSalad ? 'auto' : '30%' }}>מוצר</th>
+                            {isSalad ? (
+                              <th style={{ textAlign: 'left', width: '180px' }}>כמות כוללת לאסוף</th>
+                            ) : (
+                              <>
+                                <th style={{ textAlign: 'right' }}>פירוט קופסאות לאריזה</th>
+                                <th style={{ textAlign: 'left', width: '120px' }}>סה"כ מנות</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
-                          {catItems.map(item => (
-                            <tr key={item.id}>
-                              <td style={{ fontSize: '1.1rem' }}>{item.name}</td>
-                              <td style={{ textAlign: 'left' }} className="total-qty">{totals[item.id]}</td>
-                            </tr>
-                          ))}
+                          {catItems.map(item => {
+                            if (isSalad) {
+                              return (
+                                <tr key={item.id}>
+                                  <td style={{ fontSize: '1.1rem' }}>{item.name}</td>
+                                  <td style={{ textAlign: 'left' }} className="total-qty">{totals[item.id]}</td>
+                                </tr>
+                              );
+                            }
+
+                            const itemBoxes = boxTotals[item.id] || {};
+                            const boxEntries = Object.entries(itemBoxes)
+                              .filter(([_, count]) => count > 0)
+                              .sort(([a], [b]) => Number(a) - Number(b));
+
+                            return (
+                              <tr key={item.id}>
+                                <td style={{ fontSize: '1.1rem', fontWeight: '500', verticalAlign: 'top' }}>{item.name}</td>
+                                <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
+                                  <div className="box-breakdown-tags">
+                                    {boxEntries.map(([sizeStr, count]) => {
+                                      const size = Number(sizeStr);
+                                      const label = size === 2 
+                                        ? `${count} קופסאות של 2 ליטר (זוגיות)`
+                                        : `${count} קופסאות של ${size} ליטר`;
+                                      return (
+                                        <span key={size} className="box-tag">
+                                          {label}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </td>
+                                <td style={{ textAlign: 'left', verticalAlign: 'top' }} className="total-qty">{totals[item.id]}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

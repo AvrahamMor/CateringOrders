@@ -318,6 +318,24 @@ tr:hover td {
   font-size: 1.2rem;
 }
 
+.box-breakdown-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.box-tag {
+  display: inline-block;
+  background: rgba(201, 163, 94, 0.15);
+  border: 1px solid rgba(201, 163, 94, 0.35);
+  color: var(--text-main);
+  padding: 0.35rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
 .action-bar {
   display: flex;
   justify-content: flex-end;
@@ -396,6 +414,19 @@ tr:hover td {
   
   .print-btn {
     display: none !important;
+  }
+
+  .box-breakdown-tags {
+    gap: 0.2rem;
+  }
+
+  .box-tag {
+    background: transparent !important;
+    border: none !important;
+    color: black !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    font-weight: bold !important;
   }
 
   /* Force page breaks if table gets too long */

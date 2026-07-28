@@ -39,7 +39,6 @@ export const ITEMS = [
   { id: "arbes", name: "ארבעס", category: "salads" },
   { id: "bubes", name: "בובעס", category: "salads" },
 
-  { id: "salmon", name: "דג סלומון", category: "fish" },
   { id: "salmon_herbs", name: "דג סלומון בעשבי תיבול", category: "fish" },
   { id: "salmon_mustard", name: "דג סלומון חרדל ודבש", category: "fish" },
   { id: "white_fish", name: "וויט פיש", category: "fish" },
@@ -57,7 +56,7 @@ export const ITEMS = [
   { id: "rice", name: "אורז", category: "mains" },
   { id: "kneidlach", name: "קניידלאך", category: "mains" },
   { id: "lokshen", name: "לאקשן (אטריות)", category: "mains" },
-  { id: "gala", "name": "גאלע", category: "mains" },
+  { id: "gala", name: "גאלע", category: "mains" },
 
   { id: "crackers", name: "קרקרים", category: "extras" },
   { id: "nuts", name: "מארז פיצוחים", category: "extras" },
@@ -73,7 +72,7 @@ const generateDefaultTemplate = () => {
     if (item.category === 'salads') tpl[item.id] = 1;
     else if (item.id === 'cholent') tpl[item.id] = 1;
     else if (item.id === 'soup') tpl[item.id] = 1;
-    else if (['kugel_noodles', 'kugel_potato', 'chicken', 'salmon', 'gefilte_fish', 'white_fish', 'asado'].includes(item.id)) tpl[item.id] = 2;
+    else if (['kugel_noodles', 'kugel_potato', 'chicken', 'salmon_herbs', 'salmon_mustard', 'gefilte_fish', 'white_fish', 'asado'].includes(item.id)) tpl[item.id] = 2;
     else tpl[item.id] = 1;
   });
   return tpl;
