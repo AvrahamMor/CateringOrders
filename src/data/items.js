@@ -2,6 +2,7 @@ export const CATEGORIES = {
   salads: "סלטים וממרחים",
   fish: "דגים",
   mains: "מנות עיקריות ותוספות",
+  tasting: "טועמיה",
   extras: "קינוחים ונשנושים"
 };
 
@@ -38,6 +39,9 @@ export const ITEMS = [
   { id: "chopped_liver", name: "כבד קצוץ", category: "salads" },
   { id: "arbes", name: "ארבעס", category: "salads" },
   { id: "bubes", name: "בובעס", category: "salads" },
+  { id: "kneidlach", name: "קניידלאך", category: "salads" },
+  { id: "lokshen", name: "לאקשן (אטריות)", category: "salads" },
+  { id: "gala", name: "גאלע", category: "salads" },
 
   { id: "salmon_herbs", name: "דג סלומון בעשבי תיבול", category: "fish" },
   { id: "salmon_mustard", name: "דג סלומון חרדל ודבש", category: "fish" },
@@ -54,18 +58,21 @@ export const ITEMS = [
   { id: "soup", name: "מרק", category: "mains" },
   { id: "tzimmes", name: "צימעס", category: "mains" },
   { id: "rice", name: "אורז", category: "mains" },
-  { id: "kneidlach", name: "קניידלאך", category: "mains" },
-  { id: "lokshen", name: "לאקשן (אטריות)", category: "mains" },
-  { id: "gala", name: "גאלע", category: "mains" },
+  { id: "pastrami", name: "פסטרמה", category: "mains" },
 
   { id: "crackers", name: "קרקרים", category: "extras" },
   { id: "nuts", name: "מארז פיצוחים", category: "extras" },
   { id: "souffle", name: "קינוח סופלה", category: "extras" },
-  { id: "cake", name: "עוגה/רוגלעך", category: "extras" }
+  { id: "cake", name: "עוגה/רוגלעך", category: "extras" },
+
+  { id: "tasting_cholent", name: "טשולנט (טועמיה)", category: "tasting" },
+  { id: "tasting_farfel", name: "פערפל (טועמיה)", category: "tasting" },
+  { id: "tasting_kugel_potato", name: "קוגל תפו\"א (טועמיה)", category: "tasting" },
+  { id: "tasting_kugel_noodles", name: "קוגל אטריות (טועמיה)", category: "tasting" }
 ];
 
 // Helper to generate a default template where everything is 0 except some basics
-const generateDefaultTemplate = () => {
+const generateDefaultTemplate = (pkgName = "") => {
   const tpl = {};
   ITEMS.forEach(item => {
     // Defaults based on common sense from the image
@@ -73,6 +80,14 @@ const generateDefaultTemplate = () => {
     else if (item.id === 'cholent') tpl[item.id] = 1;
     else if (item.id === 'soup') tpl[item.id] = 1;
     else if (['kugel_noodles', 'kugel_potato', 'chicken', 'salmon_herbs', 'salmon_mustard', 'gefilte_fish', 'white_fish', 'asado'].includes(item.id)) tpl[item.id] = 2;
+    else if (item.id === 'pastrami') {
+      // Add pastrami only for VIP packages
+      tpl[item.id] = pkgName.includes('VIP') ? 1 : 0;
+    }
+    else if (item.category === 'tasting') {
+      // Add tasting items only for packages with tasting
+      tpl[item.id] = pkgName.includes('טועמיה') ? 1 : 0;
+    }
     else tpl[item.id] = 1;
   });
   return tpl;
@@ -80,8 +95,8 @@ const generateDefaultTemplate = () => {
 
 // Default constants for each package type
 export const DEFAULT_TEMPLATES = {
-  "מארז VIP": generateDefaultTemplate(),
-  "מארז רגיל": generateDefaultTemplate(),
-  "מארז VIP + טועמיה": generateDefaultTemplate(),
-  "מארז רגיל + טועמיה": generateDefaultTemplate()
+  "מארז VIP": generateDefaultTemplate("מארז VIP"),
+  "מארז רגיל": generateDefaultTemplate("מארז רגיל"),
+  "מארז VIP + טועמיה": generateDefaultTemplate("מארז VIP + טועמיה"),
+  "מארז רגיל + טועמיה": generateDefaultTemplate("מארז רגיל + טועמיה")
 };

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calculator, Plus, Minus, RotateCcw, Printer } from 'lucide-react';
+import { Settings, Calculator, Plus, Minus, RotateCcw, Printer, Save } from 'lucide-react';
 import { ITEMS, CATEGORIES, PACKAGE_TYPES, GROUP_SIZES, DEFAULT_TEMPLATES } from './data/items';
 
 function App() {
   const [activeTab, setActiveTab] = useState('calc'); // 'calc' or 'templates'
+  const [summaryView, setSummaryView] = useState('global'); // 'global' or 'breakdown'
   
   // -- State: Templates (The constants per couple for each package type) --
   const [templates, setTemplates] = useState(() => {
@@ -44,7 +45,8 @@ function App() {
   };
 
   const updateTemplateValue = (pkg, itemId, value) => {
-    const val = parseInt(value) || 0;
+    // Allow decimals (e.g. 0.5 for half liter)
+    const val = parseFloat(value) || 0;
     setTemplates(prev => ({
       ...prev,
       [pkg]: { ...prev[pkg], [itemId]: Math.max(0, val) }
@@ -68,12 +70,18 @@ function App() {
     }
   };
 
+  const handleSaveTemplates = () => {
+    localStorage.setItem('catering_templates', JSON.stringify(templates));
+    alert('התבניות נשמרו בהצלחה במערכת!\nהנתונים יישארו שמורים גם לאחר שתסגור את הדפדפן או תכבה את המחשב.');
+  };
+
   // -- Calculation Logic --
   const calculateTotals = () => {
     const totals = {};
     const boxTotals = {};
     let totalDiners = 0;
     let totalPackages = 0;
+    const breakdown = [];
 
     PACKAGE_TYPES.forEach(pkg => {
       GROUP_SIZES.forEach(gs => {
@@ -82,13 +90,16 @@ function App() {
           totalPackages += count;
           totalDiners += (count * gs.id);
 
+          const groupTotals = {};
+          const groupPerPackage = {};
+
           // For each item in the template of this package
           ITEMS.forEach(item => {
             const baseAmount = templates[pkg][item.id] || 0;
             if (baseAmount > 0) {
-              // Formula: Floor( BaseAmount * (Size / 2) ) * number of this group size
+              // Formula: BaseAmount * (Size / 2) * number of this group size
               const multiplier = gs.id / 2;
-              const amountPerGroup = Math.floor(baseAmount * multiplier);
+              const amountPerGroup = baseAmount * multiplier;
               const totalAmount = amountPerGroup * count;
 
               if (amountPerGroup > 0) {
@@ -98,17 +109,57 @@ function App() {
                 if (!boxTotals[item.id]) boxTotals[item.id] = {};
                 if (!boxTotals[item.id][gs.id]) boxTotals[item.id][gs.id] = 0;
                 boxTotals[item.id][gs.id] += count;
+
+                groupTotals[item.id] = totalAmount;
+                groupPerPackage[item.id] = amountPerGroup;
               }
             }
+          });
+
+          breakdown.push({
+            pkg,
+            gs,
+            count,
+            totals: groupTotals,
+            perPackage: groupPerPackage
           });
         }
       });
     });
 
-    return { totals, boxTotals, totalDiners, totalPackages };
+    return { totals, boxTotals, totalDiners, totalPackages, breakdown };
   };
 
-  const { totals, boxTotals, totalDiners, totalPackages } = calculateTotals();
+  const { totals, boxTotals, totalDiners, totalPackages, breakdown } = calculateTotals();
+
+  // Formatter for display
+  const formatQuantity = (item, qty) => {
+    if (qty === 0) return '';
+    const cat = item.category;
+    const id = item.id;
+
+    if (cat === 'salads' || id === 'herring') {
+      if (qty === 1) return `קופסא 1 של 250`;
+      return `${qty} קופסאות של 250`;
+    }
+    if (cat === 'fish' && id !== 'herring') {
+      if (qty === 1) return `חתיכה 1`;
+      return `${qty} חתיכות`;
+    }
+    if (['cholent', 'soup', 'rice', 'farfel'].includes(id)) {
+      if (qty === 0.5) return 'חצי ליטר';
+      if (qty === 1) return '1 ליטר';
+      if (qty === 1.5) return 'ליטר וחצי';
+      return `${qty} ליטר`;
+    }
+    if (['crackers', 'nuts', 'cake'].includes(id)) {
+      if (qty === 1) return `חבילה 1`;
+      return `${qty} חבילות`;
+    }
+    // Default (kugel, asado, chicken, souffle, pastrami, etc.)
+    if (qty === 1) return `יחידה 1`;
+    return `${qty} יחידות`;
+  };
 
   // Selected package for template editing
   const [selectedEditPkg, setSelectedEditPkg] = useState(PACKAGE_TYPES[0]);
@@ -208,74 +259,109 @@ function App() {
             {Object.keys(totals).length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>הזן כמויות במחשבון כדי לראות את רשימת האיסוף...</p>
             ) : (
-              Object.entries(CATEGORIES).map(([catKey, catName]) => {
-                const catItems = ITEMS.filter(item => item.category === catKey && totals[item.id] > 0);
-                if (catItems.length === 0) return null;
+              <div className="results-container">
+                <div className="view-tabs no-print" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '2rem' }}>
+                  <button 
+                    className={`tab-btn ${summaryView === 'global' ? 'active' : ''}`}
+                    onClick={() => setSummaryView('global')}
+                    style={{ flex: 1, maxWidth: '250px' }}
+                  >
+                    סיכום כולל (לייצור/מטבח)
+                  </button>
+                  <button 
+                    className={`tab-btn ${summaryView === 'breakdown' ? 'active' : ''}`}
+                    onClick={() => setSummaryView('breakdown')}
+                    style={{ flex: 1, maxWidth: '250px' }}
+                  >
+                    רשימת אריזה (לפי מארזים)
+                  </button>
+                </div>
 
-                const isSalad = catKey === 'salads';
+                {summaryView === 'global' && (
+                  Object.entries(CATEGORIES).map(([catKey, catName]) => {
+                    const catItems = ITEMS.filter(item => item.category === catKey && totals[item.id] > 0);
+                    if (catItems.length === 0) return null;
 
-                return (
-                  <div key={catKey} style={{ marginBottom: '2rem' }}>
-                    <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>{catName}</h3>
-                    <div className="table-container">
-                      <table>
+                    const isSalad = catKey === 'salads';
+
+                    return (
+                      <div key={catKey} style={{ marginBottom: '2rem' }}>
+                        <h3 style={{ color: 'var(--text-main)', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>{catName}</h3>
+                        <div className="table-container">
+                          <table>
                         <thead>
                           <tr>
-                            <th style={{ textAlign: 'right', width: isSalad ? 'auto' : '30%' }}>מוצר</th>
-                            {isSalad ? (
-                              <th style={{ textAlign: 'left', width: '180px' }}>כמות כוללת לאסוף</th>
-                            ) : (
-                              <>
-                                <th style={{ textAlign: 'right' }}>פירוט קופסאות לאריזה</th>
-                                <th style={{ textAlign: 'left', width: '120px' }}>סה"כ מנות</th>
-                              </>
-                            )}
+                            <th style={{ textAlign: 'right', width: '40%' }}>מוצר</th>
+                            <th style={{ textAlign: 'left' }}>כמות כוללת (לייצור/הכנה)</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {catItems.map(item => {
-                            if (isSalad) {
-                              return (
-                                <tr key={item.id}>
-                                  <td style={{ fontSize: '1.1rem' }}>{item.name}</td>
-                                  <td style={{ textAlign: 'left' }} className="total-qty">{totals[item.id]}</td>
-                                </tr>
-                              );
-                            }
-
-                            const itemBoxes = boxTotals[item.id] || {};
-                            const boxEntries = Object.entries(itemBoxes)
-                              .filter(([_, count]) => count > 0)
-                              .sort(([a], [b]) => Number(a) - Number(b));
-
-                            return (
-                              <tr key={item.id}>
-                                <td style={{ fontSize: '1.1rem', fontWeight: '500', verticalAlign: 'top' }}>{item.name}</td>
-                                <td style={{ textAlign: 'right', verticalAlign: 'top' }}>
-                                  <div className="box-breakdown-tags">
-                                    {boxEntries.map(([sizeStr, count]) => {
-                                      const size = Number(sizeStr);
-                                      const label = size === 2 
-                                        ? `${count} קופסאות של 2 ליטר (זוגיות)`
-                                        : `${count} קופסאות של ${size} ליטר`;
-                                      return (
-                                        <span key={size} className="box-tag">
-                                          {label}
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                </td>
-                                <td style={{ textAlign: 'left', verticalAlign: 'top' }} className="total-qty">{totals[item.id]}</td>
-                              </tr>
-                            );
-                          })}
+                          {catItems.map(item => (
+                            <tr key={item.id}>
+                              <td style={{ fontSize: '1.1rem', fontWeight: '500', verticalAlign: 'middle' }}>{item.name}</td>
+                              <td style={{ textAlign: 'left', verticalAlign: 'middle' }} className="total-qty">
+                                {formatQuantity(item, totals[item.id])}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
-                      </table>
-                    </div>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+
+                {summaryView === 'breakdown' && (
+                  <div className="breakdown-container">
+                    {breakdown.map((b, idx) => (
+                      <div key={idx} className="breakdown-card" style={{ marginBottom: '2.5rem', background: 'rgba(0,0,0,0.2)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                        <h3 style={{ color: 'var(--primary)', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', fontSize: '1.4rem' }}>
+                          {b.pkg} - {b.gs.name} <span style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>(סה"כ {b.count} מארזים)</span>
+                        </h3>
+                        {Object.entries(CATEGORIES).map(([catKey, catName]) => {
+                          const catItems = ITEMS.filter(item => item.category === catKey && b.totals[item.id] > 0);
+                          if (catItems.length === 0) return null;
+                          const isSalad = catKey === 'salads';
+                          return (
+                            <div key={catKey} style={{ marginBottom: '1.5rem' }}>
+                              <h4 style={{ color: 'var(--text-main)', marginBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>{catName}</h4>
+                              <div className="table-container">
+                                <table>
+                                  <thead>
+                                    <tr>
+                                      <th style={{ textAlign: 'right', width: '40%' }}>מוצר</th>
+                                      <th style={{ textAlign: 'center', width: '30%' }}>כמות במארז בודד</th>
+                                      <th style={{ textAlign: 'center', width: '30%' }}>סה"כ ({b.count} מארזים)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {catItems.map(item => (
+                                      <tr key={item.id}>
+                                        <td style={{ fontSize: '1.1rem', fontWeight: '500' }}>{item.name}</td>
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)', fontSize: '1.1rem' }}>
+                                          {formatQuantity(item, b.perPackage[item.id])}
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                                              {formatQuantity(item, b.totals[item.id])}
+                                            </span>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </div>
-                );
-              })
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -287,12 +373,17 @@ function App() {
             <div>
               <h2 style={{ color: 'var(--primary)', marginBottom: '0.5rem' }}>עריכת תבניות (קבועים לזוג)</h2>
               <p style={{ color: 'var(--text-muted)' }}>קבע כמה יחידות/מנות מזון יש לשים במארז <b>עבור זוג (2 סועדים)</b>.</p>
-              <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem' }}>המערכת תדע להכפיל ולעגל כלפי מטה אוטומטית לשלישיות, חמישיות וכו'.</p>
+              <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem' }}>המערכת תדע להכפיל אוטומטית לשלישיות, חמישיות וכו'.</p>
             </div>
             
-            <button onClick={resetTemplates} className="clear-data-btn">
-              <RotateCcw size={18} /> שחזר תבניות לברירת מחדל
-            </button>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button onClick={handleSaveTemplates} className="submit-btn" style={{ margin: 0, padding: '0.5rem 1rem', width: 'auto', fontSize: '1rem', background: '#10b981', color: 'white' }}>
+                <Save size={18} /> שמור תבניות
+              </button>
+              <button onClick={resetTemplates} className="clear-data-btn">
+                <RotateCcw size={18} /> שחזר תבניות לברירת מחדל
+              </button>
+            </div>
           </div>
 
           <div className="form-group" style={{ maxWidth: '300px', marginBottom: '2rem' }}>
@@ -319,6 +410,7 @@ function App() {
                           <input 
                             type="number" 
                             min="0"
+                            step="0.5"
                             value={val}
                             onChange={(e) => updateTemplateValue(selectedEditPkg, item.id, e.target.value)}
                             style={{ width: '60px', padding: '0.3rem', textAlign: 'center', background: 'rgba(255,255,255,0.1)' }}

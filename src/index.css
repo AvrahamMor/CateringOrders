@@ -376,7 +376,7 @@ tr:hover td {
     -webkit-backdrop-filter: none;
   }
   
-  .app-header, .tabs, .clear-data-btn, .action-bar, .package-card, .packages-grid {
+  .app-header, .tabs, .clear-data-btn, .action-bar, .package-card, .packages-grid, .no-print {
     display: none !important;
   }
   
@@ -430,6 +430,7 @@ tr:hover td {
   }
 
   /* Force page breaks if table gets too long */
+  .breakdown-card { page-break-inside: avoid; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 20px; }
   table { page-break-inside:auto }
   tr    { page-break-inside:avoid; page-break-after:auto }
   thead { display:table-header-group }
