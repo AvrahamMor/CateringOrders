@@ -30,7 +30,7 @@ export const ITEMS = [
   { id: "eggplant_mayo", name: "חציל במיונז", category: "salads" },
   { id: "fried_eggplant", name: "חציל מטוגן", category: "salads" },
   { id: "eggplant_liver", name: "חציל בטעם כבד", category: "salads" },
-  { id: "spicy", name: "חריף", category: "salads" },
+  { id: "spicy", name: "חריין", category: "salads" },
   { id: "cucumber_salad", name: "סלט מלפפון", category: "salads" },
   { id: "tuna_salad", name: "סלט טונה", category: "salads" },
   { id: "egg_salad", name: "סלט ביצים", category: "salads" },
