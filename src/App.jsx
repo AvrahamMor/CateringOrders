@@ -1,16 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Calculator, Plus, Minus, RotateCcw, Printer, Save } from 'lucide-react';
+import { Settings, Calculator, Plus, Minus, RotateCcw, Printer, Save, Download, Upload, CloudCheck, CloudOff, RefreshCw } from 'lucide-react';
 import { ITEMS, CATEGORIES, PACKAGE_TYPES, GROUP_SIZES, DEFAULT_TEMPLATES } from './data/items';
+import { subscribeToTemplates, saveTemplatesToCloud } from './firebase';
 
 function App() {
   const [activeTab, setActiveTab] = useState('calc'); // 'calc' or 'templates'
   const [summaryView, setSummaryView] = useState('global'); // 'global' or 'breakdown'
+  const [syncStatus, setSyncStatus] = useState('syncing'); // 'synced', 'syncing', 'offline'
   
   // -- State: Templates (The constants per couple for each package type) --
   const [templates, setTemplates] = useState(() => {
     const saved = localStorage.getItem('catering_templates');
     return saved ? JSON.parse(saved) : DEFAULT_TEMPLATES;
   });
+
+  // Subscribe to real-time Cloud updates from Firebase
+  useEffect(() => {
+    const unsubscribe = subscribeToTemplates(
+      (cloudTemplates) => {
+        if (cloudTemplates) {
+          setTemplates(cloudTemplates);
+          localStorage.setItem('catering_templates', JSON.stringify(cloudTemplates));
+          setSyncStatus('synced');
+        } else {
+          // First time initialization in Firestore
+          saveTemplatesToCloud(DEFAULT_TEMPLATES)
+            .then(() => setSyncStatus('synced'))
+            .catch(() => setSyncStatus('offline'));
+        }
+      },
+      (err) => {
+        console.warn('Falling back to local storage templates:', err);
+        setSyncStatus('offline');
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   // -- State: Quantities (How many groups of each size for each package type) --
   // Format: { "מארז VIP": { 2: 6, 3: 4, 5: 2, 6: 7 }, ... }
@@ -64,15 +89,68 @@ function App() {
     }
   };
 
-  const resetTemplates = () => {
-    if (window.confirm('האם לאפס את התבניות לברירת המחדל? פעולה זו תמחק את השינויים שלך בתקן.')) {
+  const resetTemplates = async () => {
+    if (window.confirm('האם לאפס את התבניות לברירת המחדל? פעולה זו תמחק את השינויים שלך בתקן בענן לכל המשתמשים.')) {
       setTemplates(DEFAULT_TEMPLATES);
+      try {
+        setSyncStatus('syncing');
+        await saveTemplatesToCloud(DEFAULT_TEMPLATES);
+        setSyncStatus('synced');
+        alert('התבניות אופסו בהצלחה בענן!');
+      } catch (err) {
+        console.error(err);
+        setSyncStatus('offline');
+        alert('התבניות אופסו מקומית בדפדפן (שגיאה בסנכרון לענן).');
+      }
     }
   };
 
-  const handleSaveTemplates = () => {
-    localStorage.setItem('catering_templates', JSON.stringify(templates));
-    alert('התבניות נשמרו בהצלחה במערכת!\nהנתונים יישארו שמורים גם לאחר שתסגור את הדפדפן או תכבה את המחשב.');
+  const handleSaveTemplates = async () => {
+    try {
+      setSyncStatus('syncing');
+      localStorage.setItem('catering_templates', JSON.stringify(templates));
+      await saveTemplatesToCloud(templates);
+      setSyncStatus('synced');
+      alert('התבניות נשמרו בהצלחה בענן!\nהשינויים זמינים כעת באופן מיידי לכל המשתמשים והמכשירים.');
+    } catch (err) {
+      console.error(err);
+      setSyncStatus('offline');
+      alert('התבניות נשמרו בדפדפן המקומי. שגיאה בסנכרון לענן.');
+    }
+  };
+
+  const handleExportTemplates = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(templates, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `catering_templates_backup_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportTemplates = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        if (parsed && typeof parsed === 'object') {
+          setTemplates(parsed);
+          setSyncStatus('syncing');
+          await saveTemplatesToCloud(parsed);
+          setSyncStatus('synced');
+          alert('התבניות יובאו בהצלחה מקובץ הגיבוי ונשמרו בענן!');
+        } else {
+          alert('קובץ לא תקין.');
+        }
+      } catch (err) {
+        alert('שגיאה בטעינת קובץ הגיבוי.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   // -- Calculation Logic --
@@ -166,9 +244,26 @@ function App() {
 
   return (
     <>
-      <header className="app-header">
-        <Calculator size={36} color="var(--primary)" />
-        <h1>מחשבון מארזים חכם</h1>
+      <header className="app-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Calculator size={36} color="var(--primary)" />
+          <h1>מחשבון מארזים חכם</h1>
+        </div>
+        <div className="sync-badge" style={{ 
+          fontSize: '0.85rem', 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          gap: '6px', 
+          padding: '4px 12px', 
+          borderRadius: '20px', 
+          background: syncStatus === 'synced' ? 'rgba(16, 185, 129, 0.15)' : syncStatus === 'syncing' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+          color: syncStatus === 'synced' ? '#10b981' : syncStatus === 'syncing' ? '#f59e0b' : '#ef4444',
+          border: `1px solid ${syncStatus === 'synced' ? 'rgba(16, 185, 129, 0.3)' : syncStatus === 'syncing' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+        }}>
+          {syncStatus === 'synced' && <><CloudCheck size={14} /> מסונכרן מול ענן Firebase (זמין מכל המכשירים)</>}
+          {syncStatus === 'syncing' && <><RefreshCw size={14} className="spin" /> מסנכרן תבניות מול הענן...</>}
+          {syncStatus === 'offline' && <><CloudOff size={14} /> מצב אופליין (שמור בדפדפן)</>}
+        </div>
       </header>
 
       <div className="tabs">
@@ -376,12 +471,19 @@ function App() {
               <p style={{ color: '#10b981', fontSize: '0.9rem', marginTop: '0.5rem' }}>המערכת תדע להכפיל אוטומטית לשלישיות, חמישיות וכו'.</p>
             </div>
             
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button onClick={handleSaveTemplates} className="submit-btn" style={{ margin: 0, padding: '0.5rem 1rem', width: 'auto', fontSize: '1rem', background: '#10b981', color: 'white' }}>
-                <Save size={18} /> שמור תבניות
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={handleSaveTemplates} className="submit-btn" style={{ margin: 0, padding: '0.5rem 1rem', width: 'auto', fontSize: '0.95rem', background: '#10b981', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Save size={18} /> שמור בדפדפן
               </button>
-              <button onClick={resetTemplates} className="clear-data-btn">
-                <RotateCcw size={18} /> שחזר תבניות לברירת מחדל
+              <button onClick={handleExportTemplates} className="submit-btn" style={{ margin: 0, padding: '0.5rem 1rem', width: 'auto', fontSize: '0.95rem', background: '#3b82f6', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Download size={18} /> גיבוי לקובץ
+              </button>
+              <label className="submit-btn" style={{ margin: 0, padding: '0.5rem 1rem', width: 'auto', fontSize: '0.95rem', background: '#8b5cf6', color: 'white', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Upload size={18} /> שחזר מקובץ
+                <input type="file" accept=".json" onChange={handleImportTemplates} style={{ display: 'none' }} />
+              </label>
+              <button onClick={resetTemplates} className="clear-data-btn" style={{ fontSize: '0.9rem' }}>
+                <RotateCcw size={16} /> שחזר לברירת מחדל
               </button>
             </div>
           </div>
